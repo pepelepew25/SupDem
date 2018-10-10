@@ -28,32 +28,33 @@ def SupDem(df, ax):
     BackLimit = 1000
     fractal_fast_factor = 3.0
     fractal_slow_factor = 6.0
-
+    fractals_show = True
 
     FastUpPts,FastDnPts = Fractals(fractal_fast_factor, High, Low, Bars, BackLimit)
-    print("FastUpPts: {}".format(FastUpPts))
-    print("FastDnPts: {}".format(FastDnPts))
+    #print("FastUpPts: {}".format(FastUpPts))
+    #print("FastDnPts: {}".format(FastDnPts))
     SlowUpPts, SlowDnPts = Fractals(fractal_slow_factor, High, Low, Bars, BackLimit)
-    print("SlowUpPts: {}".format(SlowUpPts))
-    print("SlowDnPts: {}".format(SlowDnPts))
+    #print("SlowUpPts: {}".format(SlowUpPts))
+    #print("SlowDnPts: {}".format(SlowDnPts))
 
     df = df.reset_index()
     #df = ATR(df, 8)
     print(df)
 
-    # plot fractal pts as circles to debug
-    for pts in (FastUpPts, FastDnPts, SlowUpPts, SlowDnPts):
-        plot_fractals(pts, df, ax)
+    # plot fractal pts to debug
+    if fractals_show:
+        for pts in (FastUpPts, FastDnPts, SlowUpPts, SlowDnPts):
+            plot_fractals(pts, df, ax)
+
     zones = findzones(df, FastUpPts, FastDnPts, SlowUpPts, SlowDnPts, High, Low, Close, Bars, BackLimit)
     print("drawing zones")
     print(zones)
-    drawzones(df, ax, zones)
-
-
-def drawzones(df, ax, zones):
-
-
     for z in zones:
+        drawzone(df, ax, z)
+
+
+def drawzone(df, ax, z):
+
         if z['strength'] == ZONE_WEAK and not zone_show['weak']:
             continue
         if z['strength'] == ZONE_UNTESTED and not zone_show['untested']:
@@ -73,8 +74,6 @@ def drawzones(df, ax, zones):
         plot_rectangle(ax, starttime, endtime, z['lo'], z['hi'], color)
 
 
-
-
 def findzones_is_touch(iszonesupply,turned,zonebottom,zonetop,UpPt,DnPt):
     # if the zone is resistance and the new high point has entered the zone
     # or if the zone has become Sup and the new low point has entered the zone
@@ -85,6 +84,7 @@ def findzones_is_touch(iszonesupply,turned,zonebottom,zonetop,UpPt,DnPt):
         if (turned and zonebottom <= UpPt <= zonetop) or (not turned and zonebottom <= DnPt <= zonetop):
             return True
     return False
+
 
 def findzones_is_bust(iszonesupply,turned,zonebottom,zonetop,High,Low):
     print("findzones_is_bust: iszonesupply: {} turned: {} zonebottom: {} zonetop: {} High: {} Low: {}".format(iszonesupply,
@@ -99,7 +99,7 @@ def findzones_is_bust(iszonesupply,turned,zonebottom,zonetop,High,Low):
     return False
 
 
-def findzones_isnotbust(iszonesupply,shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low, ):
+def findzones_isvalid(iszonesupply,shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low, ):
     turned = False
     hasturned = False
     isBust = False
@@ -179,6 +179,7 @@ def findzones(df, FastUpPts,FastDnPts,SlowUpPts,SlowDnPts, High, Low, Close, Bar
 
     zone_fuzzfactor = 0.75
     zone_extend = True
+    zone_merge = True
     #temp_count = 0
     temp_zones = []
     limit = min(Bars-1, BackLimit)
@@ -209,7 +210,7 @@ def findzones(df, FastUpPts,FastDnPts,SlowUpPts,SlowDnPts, High, Low, Close, Bar
 
             zonebottom = max(min(Close[shift], High[shift] - fu), High[shift] - fu * 2)
             print("found zigzag high point at {} , hival: {} loval: {}".format(shift, zonetop, zonebottom))
-            zone = findzones_isnotbust(True, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
+            zone = findzones_isvalid(True, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
             if zone:
                 #level is still valid, add to our list
                 temp_zones.append(zone)
@@ -226,7 +227,7 @@ def findzones(df, FastUpPts,FastDnPts,SlowUpPts,SlowDnPts, High, Low, Close, Bar
 
             zonetop = min(max(Close[shift], Low[shift] + fu), Low[shift] + fu * 2)
             print("found zigzag low point at {} , hival: {} loval: {}".format(shift, zonetop, zonebottom))
-            zone = findzones_isnotbust(False, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
+            zone = findzones_isvalid(False, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
             if zone:
                 # level is still valid, add to our list
                 temp_zones.append(zone)
@@ -235,6 +236,8 @@ def findzones(df, FastUpPts,FastDnPts,SlowUpPts,SlowDnPts, High, Low, Close, Bar
 
 
     #merge zones
+    #if zone_merge:
+
 
     # copy the remaining list into our official zones arrays
     zones = []
