@@ -15,9 +15,9 @@ days_history = 30
 
 symbol = 'XBTUSD'
 #symbol = 'ETHUSD'
-print("starting")
-#df = GetMarketData.GetHistoricalMarketdata(symbol, days_history, '1h', False)
-df = GetMarketData.GetCCXTMarketData(symbol, days_history, "1h", False)
+
+df = GetMarketData.GetCCXTMarketData(symbol, days_history, "1h", True)
+
 if not len(df):
     print("empty dataframe")
     exit()
@@ -27,7 +27,9 @@ df = df.dropna()
 df.index.name = 'Date'
 
 ax = plot_candlestick(df)
+
 #df = df.resample('4H').agg({'Open': 'first', 'High': 'max','Low': 'min','Close': 'last'})
+
 s = SupDem(df)
 s.plot_fractals(ax)
 s.drawzones(ax)

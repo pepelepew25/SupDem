@@ -254,7 +254,7 @@ class SupDem:
                     zonetop = zonetop + fu
 
                 zonebottom = max(min(Close[shift], High[shift] - fu), High[shift] - fu * 2)
-                print("\n Checking potential zone at high point candle {}, date {}, hival: {} loval: {}".format(shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
+                print("\n Checking potential zone at high point candle {}, date {}, high: {} low: {}".format(shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
                 zone = findzones_isvalid(True, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
                 if zone:
                     #level is still valid, add to our list
