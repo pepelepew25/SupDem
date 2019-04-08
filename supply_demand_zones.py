@@ -1,9 +1,10 @@
 import math
 from plot import *
-import talib
+#import talib
 import logging
 #from technical_indicators import ATR
-#from pandas_talib import ATR
+import technical_indicators
+#import pandas_talib
 
 
 class SupDem:
@@ -23,51 +24,46 @@ class SupDem:
                  'Res_untested': 'Orchid', 'Res_verified': 'Crimson', 'Res_proven': 'Red',
                  'Res_turncoat': 'DarkOrange'}
     zone_show = {'weak': True, 'untested': True, 'turncoat': True}
+    fractal_fast_factor = 3.0
+    fractal_slow_factor = 6.0
 
-    def __init__(self, df, ax, zone_merge = False, fractals_show=True, period=500):
-        df = df[::-1]
+    def __init__(self, df, zone_merge=False, period=500, zone_extend=True):
+        #we need to reverse the dataframe as the original MT4 code is looking backwards
+        self.df = df[::-1]
 
-        print(df)
-        High = df['High'].values
+        self.zone_extend = zone_extend
+        print(self.df)
+        High = self.df['High'].values
         print(High)
-        Low = df['Low'].values
-        Close = df['Close'].values
-        Bars = len(df.index)
-        fractal_fast_factor = 3.0
-        fractal_slow_factor = 6.0
-        #self.fractals_show = fractals_show
-        #self.zone_merge = zone_merge
+        Low = self.df['Low'].values
+        Close = self.df['Close'].values
+        Bars = len(self.df.index)
 
-        FastUpPts,FastDnPts = self.Fractals(fractal_fast_factor, High, Low, Bars, period)
-        print("FastUpPts: {}".format(FastUpPts))
-        print("FastDnPts: {}".format(FastDnPts))
+        self.FastUpPts,self.FastDnPts = self.Fractals(self.fractal_fast_factor, High, Low, Bars, period)
+        print("FastUpPts: {}".format(self.FastUpPts))
+        print("FastDnPts: {}".format(self.FastDnPts))
         #exit()
-        SlowUpPts, SlowDnPts = self.Fractals(fractal_slow_factor, High, Low, Bars, period)
-        print("SlowUpPts: {}".format(SlowUpPts))
-        print("SlowDnPts: {}".format(SlowDnPts))
+        self.SlowUpPts, self.SlowDnPts = self.Fractals(self.fractal_slow_factor, High, Low, Bars, period)
+        print("SlowUpPts: {}".format(self.SlowUpPts))
+        print("SlowDnPts: {}".format(self.SlowDnPts))
 
         #create a numeric index on the reversed dataframe
-        df = df.reset_index()
-        #df = ATR(df, 8)
-        print(df)
-        #print("test")
-        #exit()
-        # plot fractal pts to debug
-        if fractals_show:
-            for pts in (FastUpPts, FastDnPts, SlowUpPts, SlowDnPts):
-                self.plot_fractals(pts, df, ax)
+        self.df = self.df.reset_index()
 
-        tmp_zones = self.findzones( df, FastUpPts, FastDnPts, SlowUpPts, SlowDnPts, High, Low, Close, Bars, period)
+        tmp_zones = self.findzones(self.FastUpPts, self.FastDnPts, self.SlowUpPts, self.SlowDnPts, High, Low, Close, Bars, period)
         if zone_merge:
             tmp_zones = self.zones_merge(tmp_zones)
-        zones = self.type_zones(tmp_zones, Close)
-        print("drawing zones")
-        print(zones)
-        for z in zones:
-            self.drawzone(df, ax, z)
+        self.zones = self.type_zones(tmp_zones, Close)
+        print(self.zones)
 
-    def drawzone(self, df, ax, z):
+    def get_zones(self):
+        return self.zones
 
+    def drawzones(self, ax):
+        for z in self.zones:
+            self.drawzone(ax, z)
+
+    def drawzone(self, ax, z):
             if z['strength'] == self.ZONE_WEAK and not self.zone_show['weak']:
                 return
             if z['strength'] == self.ZONE_UNTESTED and not self.zone_show['untested']:
@@ -77,7 +73,7 @@ class SupDem:
 
             timeframes = {'1 days 00:00:00': 'daily', '0 days 01:00:00': 'hourly', '0 days 04:00:00': '4H',
                           '0 days 06:00:00': '6H', '7 days 00:00:00': 'Weekly'}
-            timeframe = str(df.Date.iat[0] - df.Date.iat[1])
+            timeframe = str(self.df.Date.iat[0] - self.df.Date.iat[1])
             if timeframe in timeframes:
                 timeframe = timeframes[timeframe]
 
@@ -89,14 +85,14 @@ class SupDem:
                 s += ", Test Count=" + str(z['hits'])
 
             color = self.zone_color[z['type'] + '_' + z['str']]
-            starttime = df.loc[z['start'], 'Date']
+            starttime = self.df.loc[z['start'], 'Date']
             #endtime = df.Date.iat[-1]
-            endtime = df.Date.iat[0]
+            endtime = self.df.Date.iat[0]
             #print("plot rectangle")
             plot_rectangle(ax, starttime, endtime, z['lo'], z['hi'], color, s)
 
 
-    def findzones(self, df, FastUpPts,FastDnPts,SlowUpPts,SlowDnPts, High, Low, Close, Bars, BackLimit):
+    def findzones(self, FastUpPts,FastDnPts,SlowUpPts,SlowDnPts, High, Low, Close, Bars, BackLimit):
         # iterate through zones from oldest to youngest(ignore recent 5 bars),
         # finding those that have survived through to the present
         def findzones_is_touch(iszonesupply, turned, zonebottom, zonetop, UpPt, DnPt):
@@ -133,7 +129,7 @@ class SupDem:
                     return True
             return False
 
-        def findzones_isvalid(df, iszonesupply, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low, ):
+        def findzones_isvalid(iszonesupply, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low, ):
             turned = False
             hasturned = False
             isBust = False
@@ -170,7 +166,7 @@ class SupDem:
                     # this level has been busted at least once
 
                     bustcount = bustcount + 1
-                    print("this level has been busted at least once at {}, bustcount {}".format(df.loc[i, 'Date'],
+                    print("this level has been busted at least once at {}, bustcount {}".format(self.df.loc[i, 'Date'],
                                                                                                 bustcount))
                     if bustcount > 1 or isWeak:
                         print(
@@ -213,12 +209,9 @@ class SupDem:
                 return zone
             return None
 
-
-
         zone_fuzzfactor = 0.75
-        zone_extend = True
+
         recent_bars_to_ignore = 3
-        zone_merge = True
         #temp_count = 0
         temp_zones = []
         limit = min(Bars-1, BackLimit)
@@ -227,9 +220,18 @@ class SupDem:
         #print(df['Close'].values)
         #iatr = talib.ATR(df['High'].values, df['Low'].values, df['Close'].values, 7)
         #print(iatr)
-        iatr = talib.ATR(High, Low, Close, 7)
+        #iatr = technical_indicators.ATR(High, Low, Close, 7)
+
+        #temporary to remove dependancy on talib
+        tmpdf = self.df[::-1]
+        tmpdf = tmpdf.reset_index()
+        iatr = technical_indicators.average_true_range(tmpdf, 7)
+        iatr = iatr[::-1]
         #print(iatr)
-        #exit()
+        iatr = iatr['ATR_7'].values
+        #print(iatr)
+
+
         # iterate through zones from oldest to youngest (ignore recent 5 bars),
         # finding those that have survived through to the present
         for shift in range(limit, recent_bars_to_ignore, -1):
@@ -248,12 +250,12 @@ class SupDem:
                 #store the top of the resistance zone into hival
                 zonetop = High[shift]
 
-                if zone_extend:
+                if self.zone_extend:
                     zonetop = zonetop + fu
 
                 zonebottom = max(min(Close[shift], High[shift] - fu), High[shift] - fu * 2)
-                print("\n Checking potential zone at high point candle {}, date {}, hival: {} loval: {}".format(shift, df.loc[shift, 'Date'], zonetop, zonebottom))
-                zone = findzones_isvalid(df, True, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
+                print("\n Checking potential zone at high point candle {}, date {}, hival: {} loval: {}".format(shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
+                zone = findzones_isvalid(True, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
                 if zone:
                     #level is still valid, add to our list
                     temp_zones.append(zone)
@@ -265,12 +267,12 @@ class SupDem:
                 if SlowDnPts[shift] > 0.001:
                     isWeak = False
                 zonebottom = Low[shift]
-                if zone_extend:
+                if self.zone_extend:
                     zonebottom = zonebottom - fu
 
                 zonetop = min(max(Close[shift], Low[shift] + fu), Low[shift] + fu * 2)
-                print("\n Checking potential zone at low point candle {} , date {}, hival: {} loval: {}".format(shift, df.loc[shift, 'Date'], zonetop, zonebottom))
-                zone = findzones_isvalid(df, False, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
+                print("\n Checking potential zone at low point candle {} , date {}, hival: {} loval: {}".format(shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
+                zone = findzones_isvalid(False, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
                 if zone:
                     # level is still valid, add to our list
                     temp_zones.append(zone)
@@ -307,18 +309,16 @@ class SupDem:
 
         return zones
 
+    def plot_fractals(self, ax):
+        for pts in self.FastUpPts,self.FastDnPts, self.SlowUpPts,self.SlowDnPts:
+            # plot fractal pts as circles to debug
+            for idx, value in pts.items():
+                if value > 0:
 
-
-    def plot_fractals(self, pts, df, ax):
-
-        # plot fractal pts as circles to debug
-        for idx, value in pts.items():
-            if value > 0:
-
-                time = df.loc[idx, 'Date']
-                #time = df['Date'].iloc[idx]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    n bvindex.to_pydatetime()
-                # print("time: {} value: {}".format(time, value))
-                plot_circle(ax, time, value)
+                    time = self.df.loc[idx, 'Date']
+                    #time = df['Date'].iloc[idx]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    n bvindex.to_pydatetime()
+                    # print("time: {} value: {}".format(time, value))
+                    plot_circle(ax, time, value)
 
 
     def Fractals(self, fractal_factor, High, Low, Bars, BackLimit):
