@@ -32,20 +32,20 @@ class SupDem:
         self.df = df[::-1]
 
         self.zone_extend = zone_extend
-        print(self.df)
+        logging.debug(self.df)
         High = self.df['High'].values
-        print(High)
+        logging.debug(High)
         Low = self.df['Low'].values
         Close = self.df['Close'].values
         Bars = len(self.df.index)
 
         self.FastUpPts,self.FastDnPts = self.Fractals(self.fractal_fast_factor, High, Low, Bars, period)
-        print("FastUpPts: {}".format(self.FastUpPts))
-        print("FastDnPts: {}".format(self.FastDnPts))
+        logging.debug("FastUpPts: {}".format(self.FastUpPts))
+        logging.debug("FastDnPts: {}".format(self.FastDnPts))
         #exit()
         self.SlowUpPts, self.SlowDnPts = self.Fractals(self.fractal_slow_factor, High, Low, Bars, period)
-        print("SlowUpPts: {}".format(self.SlowUpPts))
-        print("SlowDnPts: {}".format(self.SlowDnPts))
+        logging.debug("SlowUpPts: {}".format(self.SlowUpPts))
+        logging.debug("SlowDnPts: {}".format(self.SlowDnPts))
 
         #create a numeric index on the reversed dataframe
         self.df = self.df.reset_index()
@@ -54,7 +54,7 @@ class SupDem:
         if zone_merge:
             tmp_zones = self.zones_merge(tmp_zones)
         self.zones = self.type_zones(tmp_zones, Close)
-        print(self.zones)
+        logging.debug(self.zones)
 
     def get_zones(self):
         return self.zones
@@ -88,7 +88,7 @@ class SupDem:
             starttime = self.df.loc[z['start'], 'Date']
             #endtime = df.Date.iat[-1]
             endtime = self.df.Date.iat[0]
-            #print("plot rectangle")
+            #logging.debug("plot rectangle")
             plot_rectangle(ax, starttime, endtime, z['lo'], z['hi'], color, s)
 
 
@@ -112,7 +112,7 @@ class SupDem:
 
             if iszonesupply:
                 if (not turned and High > zonetop) or (turned and Low < zonebottom):
-                    print("Supply Zone is bust - turned: {} zonebottom: {} zonetop: {} High: {} Low: {}".format(turned,
+                    logging.debug("Supply Zone is bust - turned: {} zonebottom: {} zonetop: {} High: {} Low: {}".format(turned,
                                                                                                                 zonebottom,
                                                                                                                 zonetop,
                                                                                                                 High,
@@ -120,7 +120,7 @@ class SupDem:
                     return True
             else:
                 if (turned and High > zonetop) or (not turned and Low < zonebottom):
-                    print(
+                    logging.debug(
                         "Demand Zone is bust - turned: {} zonebottom: {} zonetop: {} High: {} Low: {}".format(turned,
                                                                                                               zonebottom,
                                                                                                               zonetop,
@@ -138,21 +138,21 @@ class SupDem:
             bustcount = 0
             testcount = 0
 
-            print("findzones_isvalid: iszonesupply: {} shift: {} zonetop: {} zonebottom: {} isWeak: {}".format(
+            logging.debug("findzones_isvalid: iszonesupply: {} shift: {} zonetop: {} zonebottom: {} isWeak: {}".format(
                 iszonesupply, shift, zonetop, zonebottom, isWeak))
 
             # now that we have the left boundary of the zone, look at candles to the right to find how the price reacted to the zone
             for i in range(shift - 1, 0, -1):
                 # we have a touch:
-                # print("look for touch at index {} FastUpPts[i]: {} FastDnPts[i]: {}".format(i, FastUpPts[i], FastDnPts[i]))
+                # logging.debug("look for touch at index {} FastUpPts[i]: {} FastDnPts[i]: {}".format(i, FastUpPts[i], FastDnPts[i]))
                 if findzones_is_touch(iszonesupply, turned, zonebottom, zonetop, FastUpPts[i], FastDnPts[i]):
                     # Potential touch, just make sure its been 10+candles since the prev one
-                    print("potential Touch at index {} FastUpPts[i]: {} FastDnPts[i]: {}".format(i, FastUpPts[i],
+                    logging.debug("potential Touch at index {} FastUpPts[i]: {} FastDnPts[i]: {}".format(i, FastUpPts[i],
                                                                                                  FastDnPts[i]))
                     touchOk = True
                     for j in range(i + 1, i + 11):
                         if findzones_is_touch(iszonesupply, turned, zonebottom, zonetop, FastUpPts[j], FastDnPts[j]):
-                            print("invalid touch -> it has been less than 10 candles since the previous one")
+                            logging.debug("invalid touch -> it has been less than 10 candles since the previous one")
                             touchOk = False
                             break
 
@@ -166,10 +166,10 @@ class SupDem:
                     # this level has been busted at least once
 
                     bustcount = bustcount + 1
-                    print("this level has been busted at least once at {}, bustcount {}".format(self.df.loc[i, 'Date'],
+                    logging.debug("this level has been busted at least once at {}, bustcount {}".format(self.df.loc[i, 'Date'],
                                                                                                 bustcount))
                     if bustcount > 1 or isWeak:
-                        print(
+                        logging.debug(
                             "level is Busted because bustcount > 1 or isWeak: bustcount {} isWeak {}".format(bustcount,
                                                                                                              isWeak))
                         # busted twice or more
@@ -215,11 +215,11 @@ class SupDem:
         #temp_count = 0
         temp_zones = []
         limit = min(Bars-1, BackLimit)
-        #print(High)
-        #print(Low)
-        #print(df['Close'].values)
+        #logging.debug(High)
+        #logging.debug(Low)
+        #logging.debug(df['Close'].values)
         #iatr = talib.ATR(df['High'].values, df['Low'].values, df['Close'].values, 7)
-        #print(iatr)
+        #logging.debug(iatr)
         #iatr = technical_indicators.ATR(High, Low, Close, 7)
 
         #temporary to remove dependancy on talib
@@ -227,9 +227,9 @@ class SupDem:
         tmpdf = tmpdf.reset_index()
         iatr = technical_indicators.average_true_range(tmpdf, 7)
         iatr = iatr[::-1]
-        #print(iatr)
+        #logging.debug(iatr)
         iatr = iatr['ATR_7'].values
-        #print(iatr)
+        #logging.debug(iatr)
 
 
         # iterate through zones from oldest to youngest (ignore recent 5 bars),
@@ -254,7 +254,7 @@ class SupDem:
                     zonetop = zonetop + fu
 
                 zonebottom = max(min(Close[shift], High[shift] - fu), High[shift] - fu * 2)
-                print("\n Checking potential zone at high point candle {}, date {}, high: {} low: {}".format(shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
+                logging.debug("\n Checking potential zone at high point candle {}, date {}, high: {} low: {}".format(shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
                 zone = findzones_isvalid(True, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
                 if zone:
                     #level is still valid, add to our list
@@ -271,7 +271,7 @@ class SupDem:
                     zonebottom = zonebottom - fu
 
                 zonetop = min(max(Close[shift], Low[shift] + fu), Low[shift] + fu * 2)
-                print("\n Checking potential zone at low point candle {} , date {}, hival: {} loval: {}".format(shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
+                logging.debug("\n Checking potential zone at low point candle {} , date {}, hival: {} loval: {}".format(shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
                 zone = findzones_isvalid(False, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
                 if zone:
                     # level is still valid, add to our list
@@ -286,9 +286,9 @@ class SupDem:
         zones = []
 
         for z in temp_zones:
-            print(z)
+            logging.debug(z)
             if z['hits'] >= 0:
-                print("zone hits >=0")
+                logging.debug("zone hits >=0")
                 if z['hi'] < Close[4]:
                     z['type'] = "Sup"
                 elif z['hi'] > Close[4]:
@@ -304,7 +304,7 @@ class SupDem:
                             break
                     if j == 1000:
                         z['type'] = "Sup"
-                print("adding zone to final list")
+                logging.debug("adding zone to final list")
                 zones.append(z)
 
         return zones
@@ -317,7 +317,7 @@ class SupDem:
 
                     time = self.df.loc[idx, 'Date']
                     #time = df['Date'].iloc[idx]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    n bvindex.to_pydatetime()
-                    # print("time: {} value: {}".format(time, value))
+                    # logging.debug("time: {} value: {}".format(time, value))
                     plot_circle(ax, time, value)
 
 
@@ -327,35 +327,35 @@ class SupDem:
                 P = self.fractal_period
 
             P = P / self.fractal_period * 2 + math.ceil(P / self.fractal_period / 2)
-            # print("fractal - Bars: {} P: {} M: {} shift: {}".format(Bars,P,M,shift))
+            # logging.debug("fractal - Bars: {} P: {} M: {} shift: {}".format(Bars,P,M,shift))
             if shift < P:
-                # print("   shift lower than P")
+                # logging.debug("   shift lower than P")
                 return False
 
             if shift > Bars - P:
-                # print("   shift > Bars - P")
+                # logging.debug("   shift > Bars - P")
                 return False
 
             for i in range(1, int(P)):
-                # print("i: {}".format(i))
+                # logging.debug("i: {}".format(i))
                 if M == self.UP_POINT:
-                    # print("   Up point? - i: {} PrevHigh: {} High: {}".format(i, High[shift + i], High[shift]))
+                    # logging.debug("   Up point? - i: {} PrevHigh: {} High: {}".format(i, High[shift + i], High[shift]))
                     if High[shift + i] > High[shift]:
                         return False
                     if High[shift - i] >= High[shift]:
                         return False
                 if M == self.DN_POINT:
-                    # print("   Dn point? - PrevLow: {} Low: {}".format(Low[shift + i], Low[shift]))
+                    # logging.debug("   Dn point? - PrevLow: {} Low: {}".format(Low[shift + i], Low[shift]))
                     if Low[shift + i] < Low[shift]:
                         return False
                     if Low[shift - i] <= Low[shift]:
                         return False
-            # print("return true")
+            # logging.debug("return true")
             return True
 
-        #print(High)
+        #logging.debug(High)
         limit = min(Bars-1, BackLimit)
-        #print("Fractals - Bars: {} Limit: {}".format(Bars, limit))
+        #logging.debug("Fractals - Bars: {} Limit: {}".format(Bars, limit))
         P = self.fractal_period*fractal_factor
 
         DnPts = {}
@@ -418,9 +418,9 @@ class SupDem:
                     merge_count += 1
 
             #...and merge them
-            print("found zones to merge:")
-            print(merge1)
-            print(merge2)
+            logging.debug("found zones to merge:")
+            logging.debug(merge1)
+            logging.debug(merge2)
 
             #for i in range(0, merge_count):
             for target, source in zip(merge1, merge2):
@@ -449,7 +449,7 @@ class SupDem:
 
                 zones[source]['hits'] = -1
 
-        #print("zones merged:")
-        #print(zones)
+        #logging.debug("zones merged:")
+        #logging.debug(zones)
         return zones
 
