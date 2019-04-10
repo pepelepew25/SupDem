@@ -96,7 +96,8 @@ class SupDem:
     def findzones(self, FastUpPts,FastDnPts,SlowUpPts,SlowDnPts, High, Low, Close, Bars, BackLimit):
         # iterate through zones from oldest to youngest(ignore recent 5 bars),
         # finding those that have survived through to the present
-        def findzones_is_touch(iszonesupply, turned, zonebottom, zonetop, UpPt, DnPt):
+
+        def zone_touched(iszonesupply, turned, zonebottom, zonetop, UpPt, DnPt):
             if iszonesupply:
                 # if the zone is resistance and the new high point has entered the zone
                 # or if the zone has become Sup and the new low point has entered the zone
@@ -109,24 +110,15 @@ class SupDem:
                     return True
             return False
 
-        def findzones_is_bust(iszonesupply, turned, zonebottom, zonetop, High, Low):
+        def zone_is_bust(iszonesupply, turned, zonebottom, zonetop, High, Low):
 
             if iszonesupply:
                 if (not turned and High > zonetop) or (turned and Low < zonebottom):
-                    logging.debug("Supply Zone is bust - turned: {} zonebottom: {} zonetop: {} High: {} Low: {}".format(turned,
-                                                                                                                zonebottom,
-                                                                                                                zonetop,
-                                                                                                                High,
-                                                                                                                Low))
+                    #logging.debug("Supply Zone is bust - turned: {} High: {} Low: {}".format(turned,High,Low))
                     return True
             else:
                 if (turned and High > zonetop) or (not turned and Low < zonebottom):
-                    logging.debug(
-                        "Demand Zone is bust - turned: {} zonebottom: {} zonetop: {} High: {} Low: {}".format(turned,
-                                                                                                              zonebottom,
-                                                                                                              zonetop,
-                                                                                                              High,
-                                                                                                              Low))
+                    #logging.debug("Demand Zone is bust - turned: {} High: {} Low: {}".format(turned,High,Low))
                     return True
             return False
 
@@ -139,20 +131,20 @@ class SupDem:
             bustcount = 0
             testcount = 0
 
-            logging.debug("findzones_isvalid: iszonesupply: {} shift: {} zonetop: {} zonebottom: {} isWeak: {}".format(
-                iszonesupply, shift, zonetop, zonebottom, isWeak))
+            #logging.debug("findzones_isvalid: iszonesupply: {} shift: {} zonetop: {} zonebottom: {} isWeak: {}".format(
+            #    iszonesupply, shift, zonetop, zonebottom, isWeak))
 
             # now that we have the left boundary of the zone, look at candles to the right to find how the price reacted to the zone
             for i in range(shift - 1, 0, -1):
                 # we have a touch:
                 # logging.debug("look for touch at index {} FastUpPts[i]: {} FastDnPts[i]: {}".format(i, FastUpPts[i], FastDnPts[i]))
-                if findzones_is_touch(iszonesupply, turned, zonebottom, zonetop, FastUpPts[i], FastDnPts[i]):
+                if zone_touched(iszonesupply, turned, zonebottom, zonetop, FastUpPts[i], FastDnPts[i]):
                     # Potential touch, just make sure its been 10+candles since the prev one
-                    logging.debug("potential Touch at index {} FastUpPts[i]: {} FastDnPts[i]: {}".format(i, FastUpPts[i],
+                    logging.debug("potential Touch at {} index {} FastUpPts[i]: {} FastDnPts[i]: {}".format(self.df.loc[i, 'Date'], i, FastUpPts[i],
                                                                                                  FastDnPts[i]))
                     touchOk = True
                     for j in range(i + 1, i + 11):
-                        if findzones_is_touch(iszonesupply, turned, zonebottom, zonetop, FastUpPts[j], FastDnPts[j]):
+                        if zone_touched(iszonesupply, turned, zonebottom, zonetop, FastUpPts[j], FastDnPts[j]):
                             logging.debug("invalid touch -> it has been less than 10 candles since the previous one")
                             touchOk = False
                             break
@@ -163,12 +155,13 @@ class SupDem:
                         bustcount = 0
                         testcount = testcount + 1
 
-                if findzones_is_bust(iszonesupply, turned, zonebottom, zonetop, High[i], Low[i]):
+                #check if the high has pierced the top for resitance or low has pierced the bottom
+                if zone_is_bust(iszonesupply, turned, zonebottom, zonetop, High[i], Low[i]):
                     # this level has been busted at least once
 
                     bustcount = bustcount + 1
-                    logging.debug("this level has been busted at least once at {}, bustcount {}".format(self.df.loc[i, 'Date'],
-                                                                                                bustcount))
+                    logging.debug("This level has been busted at least once at {} candle high {}, low {}, "
+                                  "bustcount {}".format(self.df.loc[i, 'Date'],High[i], Low[i],bustcount))
                     if bustcount > 1 or isWeak:
                         logging.debug(
                             "level is Busted because bustcount > 1 or isWeak: bustcount {} isWeak {}".format(bustcount,
@@ -210,6 +203,7 @@ class SupDem:
                 return zone
             return None
 
+
         zone_fuzzfactor = 0.75
 
         recent_bars_to_ignore = 3
@@ -241,10 +235,10 @@ class SupDem:
 
             isBust = False
 
-            if FastUpPts[shift] > 0.001:
+            if FastUpPts[shift]:
                 # a zigzag high point
                 isWeak = True
-                if SlowUpPts[shift] > 0.001:
+                if SlowUpPts[shift]:
                     isWeak=False
 
                 #store the top of the resistance zone into hival
@@ -254,27 +248,30 @@ class SupDem:
                     zonetop = zonetop + fu
 
                 zonebottom = max(min(Close[shift], High[shift] - fu), High[shift] - fu * 2)
-                logging.debug("\n Checking potential zone at high point candle {}, date {}, high: {} low: {}".format(shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
+                logging.debug("\n Checking potential {} supply zone at high point {}, {}, top: {} bottom: {}"
+                              .format('weak' if isWeak else 'strong',
+                                shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
                 zone = findzones_isvalid(True, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
                 if zone:
                     #level is still valid, add to our list
                     temp_zones.append(zone)
 
 
-            if FastDnPts[shift] > 0.001:
-                # a zigzag high point
+            if FastDnPts[shift]:
+                # a zigzag low point
                 isWeak = True
-                if SlowDnPts[shift] > 0.001:
+                if SlowDnPts[shift]:
                     isWeak = False
                 zonebottom = Low[shift]
                 if self.zone_extend:
                     zonebottom = zonebottom - fu
 
                 zonetop = min(max(Close[shift], Low[shift] + fu), Low[shift] + fu * 2)
-                logging.debug("\n Checking potential zone at low point candle {} , date {}, hival: {} loval: {}".format(shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
+                logging.debug("\n Checking potential {} demand zone at low point {}, {}, top: {} bottom: {}"
+                              .format('weak' if isWeak else 'strong', shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
                 zone = findzones_isvalid(False, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
                 if zone:
-                    # level is still valid, add to our list
+                    logging.debug("level is still valid, add to our list")
                     temp_zones.append(zone)
 
         return temp_zones
