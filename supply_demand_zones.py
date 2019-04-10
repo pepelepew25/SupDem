@@ -29,6 +29,7 @@ class SupDem:
 
     def __init__(self, df, zone_merge=False, period=500, zone_extend=True):
         #we need to reverse the dataframe as the original MT4 code is looking backwards
+        df.index.name = 'Date'
         self.df = df[::-1]
 
         self.zone_extend = zone_extend
@@ -59,11 +60,11 @@ class SupDem:
     def get_zones(self):
         return self.zones
 
-    def drawzones(self, ax):
+    def drawzones(self):
         for z in self.zones:
-            self.drawzone(ax, z)
+            self.drawzone(z)
 
-    def drawzone(self, ax, z):
+    def drawzone(self, z):
             if z['strength'] == self.ZONE_WEAK and not self.zone_show['weak']:
                 return
             if z['strength'] == self.ZONE_UNTESTED and not self.zone_show['untested']:
@@ -89,7 +90,7 @@ class SupDem:
             #endtime = df.Date.iat[-1]
             endtime = self.df.Date.iat[0]
             #logging.debug("plot rectangle")
-            plot_rectangle(ax, starttime, endtime, z['lo'], z['hi'], color, s)
+            plot_rectangle(starttime, endtime, z['lo'], z['hi'], color, s)
 
 
     def findzones(self, FastUpPts,FastDnPts,SlowUpPts,SlowDnPts, High, Low, Close, Bars, BackLimit):
@@ -231,7 +232,6 @@ class SupDem:
         iatr = iatr['ATR_7'].values
         #logging.debug(iatr)
 
-
         # iterate through zones from oldest to youngest (ignore recent 5 bars),
         # finding those that have survived through to the present
         for shift in range(limit, recent_bars_to_ignore, -1):
@@ -309,7 +309,7 @@ class SupDem:
 
         return zones
 
-    def plot_fractals(self, ax):
+    def plot_fractals(self):
         for pts in self.FastUpPts,self.FastDnPts, self.SlowUpPts,self.SlowDnPts:
             # plot fractal pts as circles to debug
             for idx, value in pts.items():
@@ -318,8 +318,7 @@ class SupDem:
                     time = self.df.loc[idx, 'Date']
                     #time = df['Date'].iloc[idx]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    n bvindex.to_pydatetime()
                     # logging.debug("time: {} value: {}".format(time, value))
-                    plot_circle(ax, time, value)
-
+                    plot_circle(time, value)
 
     def Fractals(self, fractal_factor, High, Low, Bars, BackLimit):
         def fractal(M, P, shift, High, Low, Bars):

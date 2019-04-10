@@ -19,12 +19,13 @@ def plot_candlestick(df, ax=None, fmt="%Y-%m-%d"):
     return ax
 
 
-def plot_circle(ax,x,y):
+def plot_circle(x,y):
     circle = plt.Circle((mdates.date2num(x), y), 1, color='blue')
+    ax=plt.gca()
     ax.add_artist(circle)
 
 
-def plot_rectangle(ax, startTime, endTime, low, high, color, text):
+def plot_rectangle(startTime, endTime, low, high, color, text):
     #print("plot rectangle: startTime {} endTime {} low {} high {} color {}".format(startTime, endTime, low, high, color))
     from matplotlib.patches import Rectangle
     #convert to matplotlib date representation
@@ -37,6 +38,7 @@ def plot_rectangle(ax, startTime, endTime, low, high, color, text):
     rx, ry = rect.get_xy()
     cx = rx + rect.get_width()/2.0
     cy = ry + rect.get_height()/2.0
+    ax = plt.gca()
     ax.annotate(text, (cx, cy), color='w', weight='bold', fontsize=6, ha='center', va='center')
 
     ax.add_patch(rect)
