@@ -31,7 +31,7 @@ def plot_rectangle(startTime, endTime, low, high, color, text):
     #convert to matplotlib date representation
     start = mdates.date2num(startTime)
     end = mdates.date2num(endTime)
-    width = end - start
+    width = (end - start)
     height = high - low
 
     rect = Rectangle((start, low), width, height, color=color, alpha=0.4)

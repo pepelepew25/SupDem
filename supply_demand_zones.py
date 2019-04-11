@@ -12,13 +12,11 @@ class SupDem:
     UP_POINT=1
     DN_POINT=-1
     fractal_period = 1
-    ZONE_Sup=1
-    ZONE_RESIST=2
-    ZONE_WEAK=0
-    ZONE_TURNCOAT=1
-    ZONE_UNTESTED=2
-    ZONE_VERIFIED=3
-    ZONE_PROVEN=4
+    zone_type = {'ZONE_WEAK': 0,
+				'ZONE_TURNCOAT': 1,
+				'ZONE_UNTESTED': 2,
+				'ZONE_VERIFIED': 3,
+				'ZONE_PROVEN': 4}
     zone_color = {'Sup_weak': 'DarkSlateGray', 'Sup_untested': 'SeaGreen', 'Sup_verified': 'Green',
                  'Sup_proven': 'LimeGreen', 'Sup_turncoat': 'OliveDrab', 'Res_weak': 'Indigo',
                  'Res_untested': 'Orchid', 'Res_verified': 'Crimson', 'Res_proven': 'Red',
@@ -54,7 +52,7 @@ class SupDem:
         tmp_zones = self.findzones(self.FastUpPts, self.FastDnPts, self.SlowUpPts, self.SlowDnPts, High, Low, Close, Bars, period)
         if zone_merge:
             tmp_zones = self.zones_merge(tmp_zones)
-        self.zones = self.type_zones(tmp_zones, Close)
+        self.zones = self.__type_zones(tmp_zones, Close)
         logging.debug(self.zones)
 
     def get_zones(self):
@@ -65,11 +63,11 @@ class SupDem:
             self.drawzone(z)
 
     def drawzone(self, z):
-            if z['strength'] == self.ZONE_WEAK and not self.zone_show['weak']:
+            if z['strength'] == self.zone_type['ZONE_WEAK'] and not self.zone_show['weak']:
                 return
-            if z['strength'] == self.ZONE_UNTESTED and not self.zone_show['untested']:
+            if z['strength'] == self.zone_type['ZONE_UNTESTED'] and not self.zone_show['untested']:
                 return
-            if z['strength'] == self.ZONE_TURNCOAT and not self.zone_show['turncoat']:
+            if z['strength'] == self.zone_type['ZONE_TURNCOAT'] and not self.zone_show['turncoat']:
                 return
 
             timeframes = {'1 days 00:00:00': 'daily', '0 days 01:00:00': 'hourly', '0 days 04:00:00': '4H',
@@ -82,7 +80,7 @@ class SupDem:
             s += z['type'] + '_' + z['str']
 
 
-            if z['strength'] == self.ZONE_PROVEN or z['strength'] == self.ZONE_VERIFIED:
+            if z['strength'] == self.zone_type['ZONE_PROVEN'] or z['strength'] == self.zone_type['ZONE_VERIFIED']:
                 s += ", Test Count=" + str(z['hits'])
 
             color = self.zone_color[z['type'] + '_' + z['str']]
@@ -122,10 +120,9 @@ class SupDem:
                     return True
             return False
 
-        def findzones_isvalid(iszonesupply, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low, ):
+        def validate_zone(iszonesupply, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low, ):
             turned = False
             hasturned = False
-            isBust = False
             touchOk = False
 
             bustcount = 0
@@ -138,6 +135,7 @@ class SupDem:
             for i in range(shift - 1, 0, -1):
                 # we have a touch:
                 # logging.debug("look for touch at index {} FastUpPts[i]: {} FastDnPts[i]: {}".format(i, FastUpPts[i], FastDnPts[i]))
+                #Check if the new high and low points have entered the zone
                 if zone_touched(iszonesupply, turned, zonebottom, zonetop, FastUpPts[i], FastDnPts[i]):
                     # Potential touch, just make sure its been 10+candles since the prev one
                     logging.debug("potential Touch at {} index {} FastUpPts[i]: {} FastDnPts[i]: {}".format(self.df.loc[i, 'Date'], i, FastUpPts[i],
@@ -153,23 +151,21 @@ class SupDem:
                         # we have a touch_  If its been busted once, remove bustcount
                         # as we know this level is still valid & has just switched sides
                         bustcount = 0
-                        testcount = testcount + 1
+                        testcount += 1
 
-                #check if the high has pierced the top for resitance or low has pierced the bottom
+                #check if the new candle high has pierced the top for resitance or low has pierced the bottom for support
                 if zone_is_bust(iszonesupply, turned, zonebottom, zonetop, High[i], Low[i]):
                     # this level has been busted at least once
 
-                    bustcount = bustcount + 1
-                    logging.debug("This level has been busted at least once at {} candle high {}, low {}, "
+                    bustcount += 1
+                    logging.debug("This level has been busted at {} candle high {}, low {}, "
                                   "bustcount {}".format(self.df.loc[i, 'Date'],High[i], Low[i],bustcount))
                     if bustcount > 1 or isWeak:
                         logging.debug(
-                            "level is Busted because bustcount > 1 or isWeak: bustcount {} isWeak {}".format(bustcount,
+                            "Level invalid: busted at least twice or busted once but Weak: bustcount {} isWeak {}".format(bustcount,
                                                                                                              isWeak))
                         # busted twice or more
-
-                        isBust = True
-                        break
+                        return None
 
                     if turned:
                         turned = False
@@ -181,27 +177,27 @@ class SupDem:
                     # forget previous hits
                     testcount = 0
 
-            if not isBust:
-                zone = {'hi': zonetop, 'lo': zonebottom, 'turn': hasturned, 'hits': testcount, 'start': shift,
-                        'merge': False}
+            zone = {'hi': zonetop, 'lo': zonebottom, 'turn': hasturned, 'hits': testcount, 'start': shift,
+                    'merge': False}
 
-                if testcount > 3:
-                    zone['strength'] = ZONE_PROVEN
-                    zone['str'] = "proven"
-                elif testcount > 0:
-                    zone['strength'] = self.ZONE_VERIFIED
-                    zone['str'] = "verified"
-                elif hasturned:
-                    zone['strength'] = self.ZONE_TURNCOAT
-                    zone['str'] = "turncoat"
-                elif not isWeak:
-                    zone['strength'] = self.ZONE_UNTESTED
-                    zone['str'] = "untested"
-                else:
-                    zone['strength'] = self.ZONE_WEAK
-                    zone['str'] = "weak"
-                return zone
-            return None
+            if testcount > 3:
+                zone['strength'] = self.zone_type['ZONE_PROVEN']
+                zone['str'] = "proven"
+            elif testcount > 0:
+                zone['strength'] = self.zone_type['ZONE_VERIFIED']
+                zone['str'] = "verified"
+            elif hasturned:
+                zone['strength'] = self.zone_type['ZONE_TURNCOAT']
+                zone['str'] = "turncoat"
+            elif not isWeak:
+                zone['strength'] = self.zone_type['ZONE_UNTESTED']
+                zone['str'] = "untested"
+            else:
+                zone['strength'] = self.zone_type['ZONE_WEAK']
+                zone['str'] = "weak"
+            logging.debug("valid zone found:{}".format(zone))
+            return zone
+
 
 
         zone_fuzzfactor = 0.75
@@ -248,10 +244,10 @@ class SupDem:
                     zonetop = zonetop + fu
 
                 zonebottom = max(min(Close[shift], High[shift] - fu), High[shift] - fu * 2)
-                logging.debug("\n Checking potential {} supply zone at high point {}, {}, top: {} bottom: {}"
+                logging.debug("Checking potential {} supply zone at high point {}, {}, top: {} bottom: {}"
                               .format('weak' if isWeak else 'strong',
                                 shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
-                zone = findzones_isvalid(True, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
+                zone = validate_zone(True, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
                 if zone:
                     #level is still valid, add to our list
                     temp_zones.append(zone)
@@ -267,25 +263,27 @@ class SupDem:
                     zonebottom = zonebottom - fu
 
                 zonetop = min(max(Close[shift], Low[shift] + fu), Low[shift] + fu * 2)
-                logging.debug("\n Checking potential {} demand zone at low point {}, {}, top: {} bottom: {}"
+                logging.debug("Checking potential {} demand zone at low point {}, {}, top: {} bottom: {}"
                               .format('weak' if isWeak else 'strong', shift, self.df.loc[shift, 'Date'], zonetop, zonebottom))
-                zone = findzones_isvalid(False, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
+                zone = validate_zone(False, shift, zonetop, zonebottom, isWeak, FastUpPts, FastDnPts, High, Low)
                 if zone:
-                    logging.debug("level is still valid, add to our list")
+                    logging.debug("Level is still valid, add to our list")
                     temp_zones.append(zone)
-
+        logging.debug("\n")
         return temp_zones
 
 
 
-    def type_zones(self, temp_zones, Close):
-        # copy the remaining list into our official zones arrays
+    def __type_zones(self, temp_zones, Close):
+        # copy the remaining list into our official zones arrays and mark them as support or resistance
         zones = []
 
         for z in temp_zones:
-            logging.debug(z)
+
+            #copy only the zones that have not been merged from another (
             if z['hits'] >= 0:
-                logging.debug("zone hits >=0")
+                logging.debug("about to mark this zone as support or resistance:{}".format(z))
+                #if the recent high is lower then mark as support
                 if z['hi'] < Close[4]:
                     z['type'] = "Sup"
                 elif z['hi'] > Close[4]:
@@ -301,9 +299,8 @@ class SupDem:
                             break
                     if j == 1000:
                         z['type'] = "Sup"
-                logging.debug("adding zone to final list")
+                logging.debug("adding {} zone to final list".format(z['type']))
                 zones.append(z)
-
         return zones
 
     def plot_fractals(self):
@@ -443,6 +440,7 @@ class SupDem:
                 if zones[target]['turn']:
                     zones[target]['hits'] = 0
 
+                #set hits to -1 to ignore the zone going forward
                 zones[source]['hits'] = -1
 
         #logging.debug("zones merged:")
